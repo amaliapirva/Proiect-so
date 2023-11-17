@@ -1,95 +1,94 @@
 #include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <string.h>
-#include <stdint.h>
- 
-struct BMPHeader {
-    char signature[2];
-    uint32_t size;
-    uint32_t reserved;
-    uint32_t offset;
-    uint32_t header_size;
-    uint32_t width;
-    uint32_t height;
-    uint16_t planes;
-    uint16_t bit_count;
-    uint32_t compression;
-    uint32_t image_size;
-    uint32_t x_pixels_per_meter;
-    uint32_t y_pixels_per_meter;
-    uint32_t colors_used;
-    uint32_t colors_important;
-};
- 
-void print_error(char *msg) {
-    write(STDERR_FILENO, msg, strlen(msg));
+#include <time.h>
+
+void afisareEroare(const char *mesaj) {
+    perror(mesaj);
     exit(EXIT_FAILURE);
 }
- 
+
+typedef struct {
+    char signature[2];
+    unsigned int fileSize;
+    unsigned short reserved1;
+    unsigned short reserved2;
+    unsigned int dataOffset;
+    unsigned int headerSize;
+    int width;
+    int height;
+    unsigned short planes;
+    unsigned short bitsPerPixel;
+    unsigned int compression;
+    unsigned int imageSize;
+    int xPixelsPerMeter;
+    int yPixelsPerMeter;
+    unsigned int totalColors;
+    unsigned int importantColors;
+} BMPHeader;
+
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        print_error("Usage: ./program <fisier intrare>\n");
+        afisareEroare("Usage: ./program <fisier_intrare>");
+    }
+
+    char *numeFisier = argv[1];
+ 
+    int fisier = open(numeFisier, O_RDONLY);
+    if (fisier == -1) {
+        afisareEroare("Eroare la deschiderea fisierului");
     }
  
-    char *filename = argv[1];
- 
-    // Deschide fisierul BMP
-    int bmp_fd = open(filename, O_RDONLY);
-    if (bmp_fd == -1) {
-        print_error("Eroare la deschiderea fisierului BMP\n");
+    BMPHeader header;
+    if (read(fisier, &header, sizeof(BMPHeader)) == -1) {
+        afisareEroare("Eroare la citirea din fisier");
     }
- 
-    // Obține informații despre fisier
-    struct stat file_stat;
-    if (fstat(bmp_fd, &file_stat) == -1) {
-        print_error("Eroare la obtinerea informatiilor despre fisier\n");
+
+    struct stat statFisier;
+    if (fstat(fisier, &statFisier) == -1) {
+        afisareEroare("Eroare la obtinerea informatiilor despre fisier");
     }
- 
-    // Citeste header-ul BMP
-    struct BMPHeader bmp_header;
-    if (read(bmp_fd, &bmp_header, sizeof(struct BMPHeader)) == -1) {
-        print_error("Eroare la citirea header-ului BMP\n");
+
+    struct tm *timeInfo;
+    time_t timpModificare = statFisier.st_mtime;
+    timeInfo = localtime(&timpModificare);
+    char dataModificare[20];
+    strftime(dataModificare, sizeof(dataModificare), "%d.%m.%Y", timeInfo);
+
+    char continut[300]; 
+    sprintf(continut, "nume fisier: %s\ninaltime: %d\nlungime: %d\ndimensiune: %ld\nidentificatorul utilizatorului: %d\ntimpul ultimei modificari: %s\ncontorul de legaturi: %ld\ndrepturi de acces user: %c%c%c\ndrepturi de acces grup: %c%c%c\ndrepturi de acces altii: %c%c%c\n",
+            numeFisier,
+            header.height, header.width,
+            statFisier.st_size,
+            statFisier.st_uid,
+            dataModificare,
+            statFisier.st_nlink,
+            (statFisier.st_mode & S_IRUSR) ? 'R' : '-',
+            (statFisier.st_mode & S_IWUSR) ? 'W' : '-',
+            (statFisier.st_mode & S_IXUSR) ? 'X' : '-',
+            (statFisier.st_mode & S_IRGRP) ? 'R' : '-',
+            (statFisier.st_mode & S_IWGRP) ? 'W' : '-',
+            (statFisier.st_mode & S_IXGRP) ? 'X' : '-',
+            (statFisier.st_mode & S_IROTH) ? 'R' : '-',
+            (statFisier.st_mode & S_IWOTH) ? 'W' : '-',
+            (statFisier.st_mode & S_IXOTH) ? 'X' : '-');
+
+    int fisierStatistica = open("statistica.txt", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    if (fisierStatistica == -1) {
+        afisareEroare("Eroare la deschiderea fisierului statistica.txt");
     }
- 
-    // Creeaza fisierul statistica.txt
-    int stats_fd = open("statistica.txt", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-    if (stats_fd == -1) {
-        print_error("Eroare la crearea fisierului statistica.txt\n");
+
+    if (write(fisierStatistica, continut, strlen(continut)) == -1) {
+        afisareEroare("Eroare la scrierea in fisierul statistica.txt");
     }
- 
-    // Scrie informatiile in fisier
-    char buffer[256];
-    sprintf(buffer, "nume fisier: %s\n", filename);
-    write(stats_fd, buffer, strlen(buffer));
- 
-    sprintf(buffer, "inaltime: %u\n", bmp_header.height);
-    write(stats_fd, buffer, strlen(buffer));
- 
-    sprintf(buffer, "lungime: %u\n", bmp_header.width);
-    write(stats_fd, buffer, strlen(buffer));
- 
-    sprintf(buffer, "dimensiune: %lu\n", file_stat.st_size);
-    write(stats_fd, buffer, strlen(buffer));
- 
-    sprintf(buffer, "identificatorul utilizatorului: %d\n", getuid());
-    write(stats_fd, buffer, strlen(buffer));
- 
-    // Obține timpul ultimei modificări
-    struct tm *modification_time = localtime(&file_stat.st_mtime);
-    strftime(buffer, sizeof(buffer), "timpul ultimei modificari: %d.%m.%Y\n", modification_time);
-    write(stats_fd, buffer, strlen(buffer));
- 
-    // Alte informații și scriere în fișier...
- 
-    // Închide fișierele
-    close(bmp_fd);
-    close(stats_fd);
- 
+
+    close(fisier);
+    close(fisierStatistica);
+
     return 0;
 }
- 
