@@ -12,12 +12,31 @@
 
 #define BUFFER 1024
 
+#pragma pack(push, 1)
 typedef struct {
-    int file_size;
-    int width;
-    int height;
-    int image_size;
+    uint16_t type;
+    uint32_t size;
+    uint16_t reserved1;
+    uint16_t reserved2;
+    uint32_t offset;
+    uint32_t dib_header_size;
+    int32_t  width_px;
+    int32_t  height_px;
+    uint16_t num_planes;
+    uint16_t bits_per_pixel;
+    uint32_t compression;
+    uint32_t image_size_bytes;
+    int32_t  x_resolution_ppm;
+    int32_t  y_resolution_ppm;
+    uint32_t num_colors;
+    uint32_t important_colors;
 } BMPHeader;
+
+typedef struct {
+    BMPHeader header;
+    uint8_t *data;
+} BMPImage;
+#pragma pack(pop)
 
 char permUSR[4];
 char permGRP[4];
@@ -55,7 +74,7 @@ void imagine(const char *fis, int tipFisier) {
     char outputBuffer[512];
     permisiune(fileInfo.st_mode);
 
-    if (tipFisier == 1) { // BMP
+    if (tipFisier == 1) { 
         BMPHeader img;
         int intrare = open(fis, O_RDONLY);
         if (intrare == -1) {
@@ -83,27 +102,27 @@ void imagine(const char *fis, int tipFisier) {
                  "contorul de legaturi: %ld\n"
                  "drepturi de acces user: %s\n"
                  "drepturi de acces grup: %s\n"
-                 "drepturi de acces altii: %s\n",
-                 fis, img.height, img.width, img.file_size, fileInfo.st_uid, modTimp, fileInfo.st_nlink, permUSR,
+                 "drepturi de acces altii: %s\n\n",
+                 fis, img.height_px, img.width_px, img.size, fileInfo.st_uid, modTimp, fileInfo.st_nlink, permUSR,
                  permGRP, permOTH);
-    } else if (tipFisier == 2) { // Director
+    } else if (tipFisier == 2) { 
         snprintf(outputBuffer, sizeof(outputBuffer),
                  "nume director: %s\n"
                  "identificatorul utilizatorului: %d\n"
                  "drepturi de acces user: %s\n"
                  "drepturi de acces grup: %s\n"
-                 "drepturi de acces altii: %s\n",
+                 "drepturi de acces altii: %s\n\n",
                  fis, fileInfo.st_uid, permUSR, permGRP, permOTH);
-    } else if (tipFisier == 3) { // Legatura simbolica
+    } else if (tipFisier == 3) { 
         snprintf(outputBuffer, sizeof(outputBuffer),
                  "nume legatura simbolica: %s\n"
                  "dimensiune legatura: %lu\n"
                  "dimensiune fisier: %lu\n"
                  "drepturi de acces user: %s\n"
                  "drepturi de acces grup: %s\n"
-                 "drepturi de acces altii: %s\n",
+                 "drepturi de acces altii: %s\n\n",
                  fis, fileInfo.st_size, fileInfo.st_size, permUSR, permGRP, permOTH);
-    } else { // Fisier obisnuit
+    } else { 
         snprintf(outputBuffer, sizeof(outputBuffer),
                  "nume fisier: %s\n"
                  "dimensiune: %lu\n"
@@ -112,7 +131,7 @@ void imagine(const char *fis, int tipFisier) {
                  "contorul de legaturi: %lu\n"
                  "drepturi de acces user: %s\n"
                  "drepturi de acces grup: %s\n"
-                 "drepturi de acces altii: %s\n",
+                 "drepturi de acces altii: %s\n\n",
                  fis, fileInfo.st_size, fileInfo.st_uid, modTimp, fileInfo.st_nlink, permUSR, permGRP, permOTH);
     }
 
@@ -137,7 +156,7 @@ void director(const char *nume) {
         exit(-1);
     }
 
-    imagine(nume, 2); // Director
+    imagine(nume, 2);
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
@@ -148,16 +167,16 @@ void director(const char *nume) {
 
         if (entry->d_type == DT_REG) {
             if (isBMP(entry->d_name)) {
-                imagine(path, 1); // BMP
+                imagine(path, 1); 
             } else {
-                imagine(path, 0); // Fisier obisnuit fara extensie BMP
+                imagine(path, 0); 
             }
         } else if (entry->d_type == DT_DIR) {
             director(path);
         } else if (entry->d_type == DT_LNK) {
-            imagine(path, 3); // Legatura simbolica
+            imagine(path, 3); 
         } else {
-            // Ignora alte tipuri de intrari
+            
         }
     }
 
